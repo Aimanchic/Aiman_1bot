@@ -13,7 +13,6 @@ API = 'e16bc2153385f377c2f736f2bc6c50af'
 #Вспомогательные переменные
 currency = CurrencyConverter()
 amount = 0
-translator = Translator()
 
 #Команда старт
 @bot.message_handler(commands=['start'])
@@ -34,9 +33,9 @@ def option(message):
         bot.send_message(message.chat.id, f'Какое слово (предложение) хотите перевести?')
         bot.register_next_step_handler(message, translate)
     elif string == 'Анекдот': #Функция анекдота
-        joke = pyjokes.get_joke()
-        a = translator.translate(joke, dest='ru')
-        bot.send_message(message.chat.id, a.text)
+        a = generate_random_joke()
+
+        bot.send_message(message.chat.id, a)
         bot.register_next_step_handler(message, option)
     elif string == 'Погода':
         bot.send_message(message.chat.id, f'В каком городе хотите узнать погоду?')
@@ -50,32 +49,46 @@ def option(message):
                                           'Instagram: https://instagram.com/mr_aiman11?igshid=MzRlODBiNWFlZA==')
         bot.register_next_step_handler(message, option)
 
+
+def generate_random_joke():
+    translator = Translator()
+
+    joke = pyjokes.get_joke()
+    a = translator.translate(joke, dest='ru')
+
+    return a.text
+
+
 #Оброботчики кнопок
 #Функция перевода
 def translate(message):
+    send = translate_message(message.text)
+
+    bot.send_message(message.chat.id, send)
+    bot.send_message(message.chat.id, 'Отлично, что ещё ты хочешь узнать?')
+    bot.register_next_step_handler(message, option)
+
+
+def translate_message(text):
     translator = Translator()
-    lang = translator.detect(message.text)
+    lang = translator.detect(text)
     lang = lang.lang
 
     if lang == 'ru':
-        send = translator.translate(message.text)
-        bot.send_message(message.chat.id, send.text)
-        bot.send_message(message.chat.id, 'Отлично, что ещё ты хочешь узнать?')
-        bot.register_next_step_handler(message, option)
+        send = translator.translate(text, dest='en')
+        return send.text
 
     else:
-        send = translator.translate(message.text, dest='ru')
-        bot.send_message(message.chat.id, send.text)
-        bot.send_message(message.chat.id, 'Отлично, что ещё ты хочешь узнать?')
-        bot.register_next_step_handler(message, option)
+        send = translator.translate(text, dest='ru')
+        return send.text
 
 
 #Функция погоды
 def weather(message):
     city = message.text.strip().lower()
-    res = requests.get(f'https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API}&units=metric')
-    if res.status_code == 200:
-        data = json.loads(res.text)
+    data = get_weather_by_city(city)
+
+    if data:
         bot.send_message(message.chat.id, f'Сейчас погода в городе {message.text}: {data["main"]["temp"]} \n'
                                               f'Ощущается как: {data["main"]["feels_like"]}')
         bot.send_message(message.chat.id, 'Отлично, что ещё ты хочешь узнать?')
@@ -83,6 +96,15 @@ def weather(message):
     else:
         bot.send_message(message.chat.id, f'Город не найден. Попробуйте ещё раз.')
         bot.register_next_step_handler(message, weather)
+
+
+def get_weather_by_city(city):
+    res = requests.get(f'https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API}&units=metric')
+    if not res.status_code == 200:
+        return None
+
+    return res.json()
+
 
 #Функция перевода валют
 def curr(message):
@@ -124,5 +146,6 @@ def anothercurrency(message):
         bot.send_message(message.chat.id, 'Что-то пошло не так, введите пару корректно.')
         bot.register_next_step_handler(message, anothercurrency)
 
-#Бот начинает работать
-bot.polling(none_stop=True)
+
+if __name__ == "__main__":
+    bot.polling(none_stop=True)
